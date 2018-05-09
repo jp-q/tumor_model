@@ -12,7 +12,7 @@ raw_multiplex[,4:61] <- log(data.matrix(raw_multiplex[,4:61]))
 log_multiplex <- raw_multiplex
 
 mscore <- as.numeric(log_multiplex$Mscore)
-mscore[mscore<26 & mscore !=0] = -1
+mscore[mscore<26 & mscore !=0] = 0
 mscore[mscore >=26] =1
 
 log_multiplex$Mresponse <- mscore
@@ -22,100 +22,63 @@ log_multiplex$Mresponse <- mscore
 ###############################################
 #HEATMAP
 ###############################################
-
-annocol <- data.frame( Tu = factor(log_multiplex$tumor),
-  m = factor(log_multiplex$Mresponse)
-)
-rownames(annocol) <- rownames(log_multiplex)
-###annotation color needs to be revised
-
-pheatmap::pheatmap(
-  t(log_multiplex[,4:61]),
-  cluster_cols = T,
-  cluster_rows = T,
-  #breaks = c(-4,-2,-1.5,-1,-0.75,-0.5,-0.25,0,0.2,0.4,0.6,0.8,1,1.5,2.6),
-  #color = colorRampPalette(rev(brewer.pal(
-   # name = 
-   #   "RdBu",
-   # n=9
-  #)))(15),
-  #annotation_colors = tre_colr[1],
-   labels_col  = log_multiplex$treatment,
-  #gaps_col = 1,
-  main = "log_test",
-  annotation_col = annocol,
-  border_color = FALSE
-)
-
-
-#try only reponse
-pheatmap::pheatmap(
-  t(log_multiplex[mscore>= 0,4:61]),
-  cluster_cols = T,
-  cluster_rows = T,
-  #breaks = c(-4,-2,-1.5,-1,-0.75,-0.5,-0.25,0,0.2,0.4,0.6,0.8,1,1.5,2.6),
-  #color = colorRampPalette(rev(brewer.pal(
-  # name = 
-  #   "RdBu",
-  # n=9
-  #)))(15),
-  #annotation_colors = tre_colr[1],
-  labels_col  = log_multiplex$treatment,
-  #gaps_col = 1,
-  main = "log_test",
-  annotation_col = annocol,
-  border_color = FALSE
-)
-
-
 #try fold change
-
 logfc <-  sapply(rownames(log_multiplex), function (cn) {
   ctrl_col <- gsub("\\_.*", "_control", cn)
   log_multiplex[cn,4:61] - log_multiplex[ctrl_col,4:61]
 })
 logfc <- logfc[,-(1:20)]
 logfc <- data.frame(logfc)
-annocol <- data.frame( Tu = factor(c(rep(seq(1,20),5) )),
-                       m = factor(log_multiplex$Mresponse)[21:120]
+logfc <- logfc[,rownames(log_multiplex)[21:120]]
+
+annocol <- data.frame( Tu = gsub("_.*","",colnames(logfc)),
+                       m = as.factor(factor(log_multiplex$Mresponse)[21:120])
 )
 rownames(annocol) <- colnames(logfc)
-###annotation color needs to be revised
 
-library(RColorBrewer)
 pheatmap::pheatmap(
   data.matrix(logfc),
   cluster_cols = T,
   cluster_rows = T,
-  breaks = c(-8,-4,-2,-1,-0.75,-0.5,-0.25,0,0.2,0.4,0.5,1,2,4,6),
-  color = colorRampPalette(rev(brewer.pal(
-   name = 
-     "RdBu",
-   n=9
-  )))(15),
-  #annotation_colors = tre_colr[1],
-  labels_col  = log_multiplex$treatment[21:120],
-  #gaps_col = 1,
-  main = "logfc_test",
-  annotation_col = annocol,
-  border_color = FALSE
-)
-
-
-pheatmap::pheatmap(
-  data.matrix(logfc[,mscore[21:120] > 0]),
-  cluster_cols = T,
-  cluster_rows = T,
-  breaks = c(-8,-4,-2,-1,-0.75,-0.5,-0.25,0,0.2,0.4,0.5,1,1.5,2,6),
+  breaks = c(-4,-2,-1.5,-1,-0.75,-0.5,-0.25,0,0.2,0.4,0.6,0.8,1,1.5,2.6),
   color = colorRampPalette(rev(brewer.pal(
     name = 
       "RdBu",
     n=9
   )))(15),
-  #annotation_colors = tre_colr[1],
-  labels_col  = log_multiplex$treatment[21:120][mscore[21:120] > 0],
+  # annotation_colors = tre_colr[1],
+  labels_col  = gsub(".*_","",colnames(test)),
   #gaps_col = 1,
-  main = "logfc_test",
+  main = "Mitra Cytokine logfc Heatmap",
+  annotation_col = annocol,
+  border_color = FALSE
+)
+
+
+#responder only (clustered)
+library(RColorBrewer)
+test <- logfc[,log_multiplex[21:120,]$Mresponse>0]
+test1 <- log_multiplex[log_multiplex$Mresponse>0,]
+
+test <- test[,order(as.numeric(test1$Mscore))]
+annocol <- data.frame( Tu = gsub("_.*","",colnames(test))
+                      # m= as.numeric(test1$Mscore)[order(as.numeric(test1$Mscore))]
+)
+rownames(annocol) <- colnames(test)
+pheatmap::pheatmap(
+  data.matrix(test),
+  cluster_cols = T,
+  cluster_rows = T,
+  breaks = c(-4,-2,-1.5,-1,-0.75,-0.5,-0.25,0,0.2,0.4,0.6,0.8,1,1.5,2.6),
+  color = colorRampPalette(rev(brewer.pal(
+   name = 
+     "RdBu",
+   n=9
+  )))(15),
+ # annotation_colors = tre_colr[1],
+  labels_col  = gsub(".*_","",colnames(test)),
+  #gaps_col = 1,
+  main = "Responder only cytokine",
   annotation_col = annocol,
   border_color = FALSE
 )
@@ -125,10 +88,11 @@ pheatmap::pheatmap(
 logfc_m <- logfc
 logfc_m[59,] <- as.factor(log_multiplex$Mscore[21:120])
 rownames(logfc_m)[59] <- "mscore"
-test <- logfc_m[,order(-as.numeric(unlist(logfc_m[nrow(logfc_m),])))]
+test <- logfc_m[,order(as.numeric(unlist(logfc_m[nrow(logfc_m),])))]
+tu <- factor(c(rep(seq(1,20),5) )[order(as.numeric(unlist(logfc_m[nrow(logfc_m),])))])
 
-
-annocol <- data.frame( Tu = factor(c(rep(seq(1,20),5) ))[order(-as.numeric(unlist(logfc_m[nrow(logfc_m),])))]
+annocol <- data.frame( m = as.numeric(as.character(unlist(test[59,]))),
+  Tu =  tu
 )
 rownames(annocol) <- colnames(test)
 
@@ -138,14 +102,13 @@ pheatmap::pheatmap(
   cluster_rows = T,
   breaks = c(-8,-4,-1.25,-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.5,2,6),
   color = colorRampPalette(rev(brewer.pal(
-    name = 
-      "RdBu",
+    name = "RdBu",
     n=9
   )))(15),
   #annotation_colors = tre_colr[1],
-  labels_col  = log_multiplex$treatment[21:120][order(-as.numeric(unlist(logfc_m[nrow(logfc_m),])))],
+  labels_col  = gsub(".*_","",colnames(test)),
   #gaps_col = 1,
-  main = "logfc_m_test",
+  main = "Sort m score from low to high Cytokine",
   annotation_col = annocol,
   border_color = FALSE
 )
@@ -201,6 +164,11 @@ mitra_hnscc_sigscores <- cbind(scoreSignatures(mitra_hnscc_logfc, mitra_hnscc_rt
 
 
 ##end stealing
+
+
+
+
+# correaltion plot on 17-plex cytokine and its gene
 gene_list <- c("CSF2","TNFRSF9","IFNG","IL10","GZMA","IL13","GZMB","FAS","IL2","IL4","IL5","IL6","FASLG","CCL3","CCL4","TNF","PRF1")
 gtr <- names(mitra_hnscc_rtg)
 names(gtr) <- unname(mitra_hnscc_rtg)
@@ -227,21 +195,15 @@ rownames(gene_17_logfc) <- mitra_hnscc_rtg[rownames(gene_17_logfc)]
 gene_17_logfc <- gene_17_logfc[,sort(colnames(gene_17_logfc))]
 
 b <- diag(cor(t(gene_17_logfc), t(cytologfc_17)))
-
-
-plot(unname(b),xaxt="n",ylab = "correlation")
-axis(1,at=1:17,labels=names(b))
- names(b) <- rownames(cytologfc_17)
 a <-  cor.test(t(gene_17_logfc),t(cytologfc_17))
+corrplot::corrplot(cor(t(gene_17_logfc), t(cytologfc_17)),title = "17 plex cytokine and corresponding gene corplot",col = colorRampPalette(c("blue", "white","red"))( 100 ),diag = T,tl.col = "black",tl.cex = 0.7)
 
  
 
 
 
-
-
 ###############################
-#sig genes
+#sig genes for jieqing request
 ###############################
 sigs <- c(#"CHAN_INTERFERON_PRODUCING_DENDRITIC_CELL",
           #"GNF2_CD7",
@@ -266,7 +228,7 @@ names(gtr) <- unname(mitra_hnscc_rtg)
 
 
 #################this function plots heatmap as jieqing's request
-#################requires a signature and a treatment arm as input
+#################requires a signature in list format and a treatment arm [i] as input
 sigs_gene_heatmap <- function(sigs_gene,i){
 
   genename <- na.omit(unname(gtr[unlist(unname(sigs_gene))]))
@@ -353,7 +315,7 @@ sigs_gene_heatmap <- function(sigs_gene,i){
 length(sigs)
 
 for( j in 1:length(sigs)){
-sigs_gene_heatmap(signature.list[sigs[j]],6)
+sigs_gene_heatmap(signature.list[sigs[j]],2)
 }
 sigs_gene_heatmap(signature.list[sigs[1]],2)
 
@@ -361,7 +323,8 @@ sigs_gene_heatmap(signature.list[sigs[1]],2)
 
 
 
-#correlation vs more
+
+#correlation vs all gene
 gene_logfc <- mitra_hnscc_logfc
 ptt <- 	c("Tu1","Tu2","Tu3","Tu4","Tu5","Tu6","Tu7","Tu8","Tu9","Tu10","Tu11","Tu12","Tu13","Tu14","Tu15","Tu16","Tu17","Tu18","Tu19","Tu20")
 names(ptt) <- c("HNS1R",	"HNS3R","HNS4R","HNS5R","HNS7R","HNS9R","HNS10R","HNS11R","HNS13R","HNS15R","HNS16R","HNS18R","HNS19R","HNS20R","HNS21R",
@@ -386,30 +349,6 @@ b <- data.frame(genename = unname(mitra_hnscc_rtg[as.character(rownames(cor_resu
 cor_result <- cbind(cor_result,b)
 
 
-
-#loop to get high cor values
-c <- character()
-
-for(i in 1:nrow(cor_result)){
-  for(j in 1:58){
-    b <- as.numeric()
-    a <- as.numeric(cor_result[i,j])
-    if (is.na(a)){
-      a=0
-    }
-   if( a > 0.5){
-      b <- a
-      names(b) <- paste(cor_result[i,61],colnames(cor_result)[j], sep="_")
-    } 
- if( a < -0.5){
-     b <- a
-      names(b) <- paste(cor_result[i,61],colnames(cor_result)[j], sep="_")
-   }
-    c <- c(c,b)
-    print(paste(i,j))
-}
-    
-  }
 
 
 ####grep interested genes
@@ -464,24 +403,22 @@ names(ptt) <- c("HNS1R",	"HNS3R","HNS4R","HNS5R","HNS7R","HNS9R","HNS10R","HNS11
                 "HNS22R","HNS23R","HNS26R","HNS27R","HNS28R")
 colnames(model_sigscore) <-  paste(unname(ptt[gsub("x.*","",colnames(model_sigscore))]),gsub(".*x","",colnames(model_sigscore)),sep = "_")
 
-mscore_data <- log_multiplex
-rownames(mscore_data) <- gsub("control","1",rownames(mscore_data))
-rownames(mscore_data) <- gsub("M7824.M6903","5",rownames(mscore_data))
-rownames(mscore_data) <- gsub("M7824.M6223","6",rownames(mscore_data))
-rownames(mscore_data) <- gsub("M7824","2",rownames(mscore_data))
-rownames(mscore_data) <- gsub("M6903","3",rownames(mscore_data))
-rownames(mscore_data) <- gsub("M6233","4",rownames(mscore_data))
-mscore_data <- mscore_data[mscore_data$Mscore !=0,]
-model_sigscore <- model_sigscore[,gsub(".*\\_","",colnames(model_sigscore))!=1]
-mscore_data <- mscore_data[rownames(mscore_data)%in% colnames(model_sigscore),]
-model_sigscore <- model_sigscore[,colnames(model_sigscore) %in% rownames(mscore_data)]
-
-mscore_data <- data.matrix(t(mscore_data[,-c(1,2,3,62)]))
-model_sigscore <- model_sigscore[,sort(colnames(model_sigscore))] 
-mscore_data <- rbind(model_sigscore, mscore_data)
-
-
-
+# mscore_data <- log_multiplex
+# rownames(mscore_data) <- gsub("control$","1",rownames(mscore_data))
+# rownames(mscore_data) <- gsub("M7824.M6903$","5",rownames(mscore_data))
+# rownames(mscore_data) <- gsub("M7824.M6223$","6",rownames(mscore_data))
+# rownames(mscore_data) <- gsub("M7824$","2",rownames(mscore_data))
+# rownames(mscore_data) <- gsub("M6903$","3",rownames(mscore_data))
+# rownames(mscore_data) <- gsub("M6233$","4",rownames(mscore_data))
+# mscore_data <- mscore_data[mscore_data$Mscore !=0,]
+# model_sigscore <- model_sigscore[,gsub(".*\\_","",colnames(model_sigscore))!=1]
+# mscore_data <- mscore_data[rownames(mscore_data)%in% colnames(model_sigscore),]
+# model_sigscore <- model_sigscore[,colnames(model_sigscore) %in% rownames(mscore_data)]
+# 
+# mscore_data <- data.matrix(t(mscore_data[,-c(1,2,3)]))
+# model_sigscore <- model_sigscore[,colnames(mscore_data)] 
+# mscore_data <- rbind(model_sigscore, mscore_data)
+# mscore_data <- mscore_data[-91,]
 #a <- glmnet(t(mscore_data[-c(33,34),]),mscore_data[34,],family = "binomial")
 #sparse lvl?
 
@@ -518,25 +455,25 @@ mscore_data <- rbind(model_sigscore, mscore_data)
 # obj <- glmgraph(X,Y,L,family="binomial")
 # plot(obj)
 
-model_sigscore <- mscore_data[-c(33,34),]
-###try to test this model
-test <- model_sigscore[,1:82]
-train <- model_sigscore[,83:92]
-class(test) <- "numeric"
-class(train) <- "numeric"
-test_L <- t(matrix(rep(1,82*(nrow(model_sigscore))),ncol = 82,nrow = nrow(model_sigscore)))
-test_M <- as.numeric(mscore_data[34,])[1:82]
-train_M <- as.numeric(mscore_data[34,])[83:92]
-b <- glmgraph(X=t(as.matrix(test)),Y= test_M,L= test_L,family = "binomial",penalty = "lasso")
-plot(b)
-#fail
-i = predict(b,t(as.matrix(train)),type = "class")
-
-#sort of works
-a <- glmnet(t(as.matrix(test)), test_M,family = "binomial")
-View(predict(a,newx=t(as.matrix(train)),type = "class"))
-sort(a$beta[,53])
-
+# model_sigscore <- mscore_data[-c(33,34),]
+# ###try to test this model
+# test <- model_sigscore[,1:82]
+# train <- model_sigscore[,83:92]
+# class(test) <- "numeric"
+# class(train) <- "numeric"
+# test_L <- t(matrix(rep(1,82*(nrow(model_sigscore))),ncol = 82,nrow = nrow(model_sigscore)))
+# test_M <- as.numeric(mscore_data[34,])[1:82]
+# train_M <- as.numeric(mscore_data[34,])[83:92]
+# b <- glmgraph(X=t(as.matrix(test)),Y= test_M,L= test_L,family = "binomial",penalty = "lasso")
+# plot(b)
+# #fail
+# i = predict(b,t(as.matrix(train)),type = "class")
+# 
+# #sort of works
+# a <- glmnet(t(as.matrix(test)), test_M,family = "binomial")
+# View(predict(a,newx=t(as.matrix(train)),type = "class"))
+# sort(a$beta[,53])
+# 
 
 
 
@@ -583,9 +520,9 @@ sort(a$beta[,53])
 
 #A=model_sigscore
 
-input <- mscore_data[1:32,]
-y <- as.factor(mscore_data[91,])
-randco <- function(A) {
+#input <- mscore_data[1:32,]
+#y <- as.factor(mscore_data[91,])
+#randco <- function(A) {
   #A <- model_sigscore
   hist <- c()
   repeat{
@@ -664,7 +601,7 @@ randco <- function(A) {
   
    }
 
-randco(model_sigscore)
+#randco(model_sigscore)
 
 #t(replicate(10,randco(A)))
 
@@ -685,27 +622,64 @@ randco(model_sigscore)
 
 
 ################try log muiltiplex
+logfc <-  sapply(rownames(log_multiplex), function (cn) {
+  ctrl_col <- gsub("\\_.*", "_control", cn)
+  log_multiplex[cn,4:61] - log_multiplex[ctrl_col,4:61]
+})
+logfc <- logfc[,-(1:20)]
+logfc <- data.frame(logfc)
+colnames(logfc) <- gsub("control$","1",colnames(logfc))
+colnames(logfc) <- gsub("M7824.M6903$","5",colnames(logfc))
+colnames(logfc) <- gsub("M7824.M6223$","6",colnames(logfc))
+colnames(logfc) <- gsub("M7824$","2",colnames(logfc))
+colnames(logfc) <- gsub("M6903$","3",colnames(logfc))
+colnames(logfc) <- gsub("M6233$","4",colnames(logfc))
+
+logfc <- logfc[,colnames(logfc)%in% colnames(model_sigscore)]
+logfc <- logfc[,colnames(model_sigscore)]
+
+#combine glucose together
+glu <- readODS::read.ods("~/GITCLONES/2017-11-09-Jingping-Nilogen/Mitra/jpApr2018/jp_mitra.ods",sheet = 8)
+colnames(glu) <- glu[1,]
+glu <- glu[-1,]
+rownames(glu) <- "glucose"
+glu <- glu[,colnames(glu) %in% colnames(model_sigscore)]
+glu <- glu[,colnames(model_sigscore)]
+input <- rbind(model_sigscore,logfc,glu)
+input <- data.frame(input)
+input <- data.matrix(input)
 
 
-model_cyto <- data.matrix(logfc)
-model_m <- log_multiplex$Mresponse[21:120]
 
+#get m score
+ mscore_data <- log_multiplex
+ rownames(mscore_data) <- gsub("control$","1",rownames(mscore_data))
+ rownames(mscore_data) <- gsub("M7824.M6903$","5",rownames(mscore_data))
+ rownames(mscore_data) <- gsub("M7824.M6223$","6",rownames(mscore_data))
+ rownames(mscore_data) <- gsub("M7824$","2",rownames(mscore_data))
+ rownames(mscore_data) <- gsub("M6903$","3",rownames(mscore_data))
+ rownames(mscore_data) <- gsub("M6233$","4",rownames(mscore_data))
+ mscore_data <- mscore_data[mscore_data$Mscore !=0,]
+ mscore_data <- mscore_data[rownames(mscore_data) %in% colnames(input),]
+mscore_data <- mscore_data[colnames(input),]
+ 
+ response <- as.numeric(mscore_data$Mresponse)
+response[response == -1]  <- 0
 
-
-model_plex<- function(A) {
+#model_plex<- function(A) {
   hist <- c()
   #A <- model_sigscore
   repeat{
-    class(A) <- "numeric"
+   # class(A) <- "numeric"
     A <- scale(t(A))
     A <- t(A)
-    t <- sample(100,20)
+    t <- sample(92,22)
     train <- A[,-t]
     test <- A[,t]
     
-    response <- model_m[-t]
-    test_response <- model_m[t]
-    a <- glmnet(t(as.matrix(train)), response,family = "binomial")
+    train_response <- response[-t]
+    test_response <- response[t]
+    a <- glmnet(t(as.matrix(train)), train_response,family = "binomial")
     b <- data.frame(predict(a,newx =t(test),type  ="class"))
     list_acc <- c()
     for(i in 1: ncol(b)){
@@ -749,20 +723,19 @@ model_plex<- function(A) {
     }
   }
 }
+#a <- model_plex(input)
+a <- cv.glmnet(t(input), response,family = "binomial",nfolds = nrow(t(input)))
+plot(a)
 
-
-########################### combination of cyto and sigs
-#input
-input <- mscore_data[-91,]
-response <- as.numeric(mscore_data[91,])
-response[response == -1]  <- 0
+########################### loop to find a model
 setwd("~/GITCLONES/2017-11-09-Jingping-Nilogen/Mitra/jpApr2018/")
 
 full_model <- function(A) {
-  A <- input
+  #A <- input
   hist <- c()
   repeat{
-    class(A) <- "numeric"
+    #class(A) <- "numeric"
+    A <- data.matrix(A)
     A <- scale(t(A))
     A <- t(A)
     t <- sample(92,20)
@@ -771,11 +744,11 @@ full_model <- function(A) {
     
     train_response <- response[-t]
     test_response <- response[t]
-    a <- cv.glmnet(t(as.matrix(train)), train_response,family = "binomial")
+    a <- cv.glmnet(t(as.matrix(train)), train_response,family = "binomial",nfolds = nrow(train))
     b <- predict(a,newx =t(test),type  ="class",s="lambda.min")
     #list_acc <- c()
     #for(i in 1: ncol(b)){
-    accu <- length(which(as.numeric(as.character(unlist(b[i]))) != test_response))
+    accu <- length(which(as.numeric(as.character(unlist(b))) != test_response))
     #list_acc <- c(list_acc,sum(accu))
     
        
@@ -783,7 +756,8 @@ full_model <- function(A) {
     print(accu)
    hist <- c(accu,hist)
    # if(min(list_acc) < 2){
-    if(accu < 7){
+    if(accu < 3){
+      if(sum(as.numeric(as.character(unlist(b)))) != 0){
       sink(file=paste("result.txt"))
    #   cat(paste("difference for all results:\n"))
       cat(paste("The number of diff is:\n"))
@@ -791,7 +765,7 @@ full_model <- function(A) {
       cat("\n\n")
       #best <- which(list_acc == min(list_acc))
       cat(paste(" The predict result: \n"))
-      cat(as.numeric(as.character(unlist(b[i]))))
+      cat(as.numeric(as.character(unlist(b))))
       cat("\n\n")
      # for(j in 1:length(best)){
       #  cat("======================================")
@@ -813,9 +787,46 @@ full_model <- function(A) {
       plot(a)
       return(a)
       break
+      }
     }
 }
 }
+a <- full_model(input)
+
+
+# A <- input
+# A <- data.matrix(A)
+# A <- scale(t(A))
+# A <- t(A)
+# a <- cv.glmnet(t(A),response,family="binomial",nfolds = nrow(t(A)))
+
+plot(a)
+
+
+
+###try to seperate train and test by treatment
+A <- input
+A <- data.matrix(A)
+A <- scale(t(A))
+A <- t(A)
+t <- grep("2$",colnames(A))
+train <- A[,t]
+test <- A[,-t]
+
+train_response <- response[t]
+test_response <- response[-t]
+a <- glmnet(t(as.matrix(train)), train_response,family = "binomial")
+b <- data.frame(predict(a,newx =t(test),type  ="class"))
+list_acc <- c()
+for(i in 1: ncol(b)){
+  accu <- length(which(as.numeric(as.character(unlist(b[i]))) != test_response))
+  list_acc <- c(list_acc,sum(accu))
+  
+  
+}
+print(list_acc)
+
+
 # aaa <- cv.glmnet(scale(t(input)),as.numeric(response))
 # plot(aaa)
 # coef_cv=coef(aaa, s = "lambda.min")
@@ -827,11 +838,529 @@ setwd("~/GITCLONES/2017-11-09-Jingping-Nilogen/Mitra/jpApr2018/")
 
 
 glu <- readODS::read.ods("~/GITCLONES/2017-11-09-Jingping-Nilogen/Mitra/jpApr2018/jp_mitra.ods",sheet = 8)
-
-
+colnames(glu) <- glu[1,]
+glu <- glu[-1,]
+rownames(glu) <- "glucose"
 
 ihc <- readODS::read.ods("~/GITCLONES/2017-11-09-Jingping-Nilogen/Mitra/jpApr2018/jp_mitra.ods",sheet = 3)
 rownames(ihc) <- ihc[,1]
 colnames(ihc) <- ihc[1,]
 ihc <- ihc[-1,-1]
 ihc <- scale(data.matrix(ihc))
+pheatmap::pheatmap(t(ihc))
+
+#use M7824 mscore to see if there is any linear correlation
+ihc_response <- as.numeric(mscore_data[92,1:19])
+ihc <- ihc[-16,]
+a <- cv.glmnet(ihc,ihc_response, family= "binomial",nfolds = nrow(ihc))
+
+
+
+
+
+
+
+
+
+
+
+#####################boxplots and t-test
+
+glu <- readODS::read.ods("~/GITCLONES/2017-11-09-Jingping-Nilogen/Mitra/jpApr2018/jp_mitra.ods",sheet = 8)
+colnames(glu) <- glu[1,]
+glu <- glu[-1,]
+rownames(glu) <- "glucose"
+
+
+logfc <-  sapply(rownames(log_multiplex), function (cn) {
+  ctrl_col <- gsub("\\_.*", "_control", cn)
+  log_multiplex[cn,4:61] - log_multiplex[ctrl_col,4:61]
+})
+logfc <- logfc[,-(1:20)]
+logfc <- data.frame(logfc)
+colnames(logfc) <- gsub("control$","1",colnames(logfc))
+colnames(logfc) <- gsub("M7824.M6903$","5",colnames(logfc))
+colnames(logfc) <- gsub("M7824.M6223$","6",colnames(logfc))
+colnames(logfc) <- gsub("M7824$","2",colnames(logfc))
+colnames(logfc) <- gsub("M6903$","3",colnames(logfc))
+colnames(logfc) <- gsub("M6233$","4",colnames(logfc))
+glu <- glu[,colnames(logfc)]
+t_cyto <- rbind(logfc,glu)
+response_t <- log_multiplex[21:120,63]
+
+####### m score or not
+library(ggplot2)
+var_x <- data.frame(t(t_cyto[,response_t !=0]))
+var_x <- data.matrix(var_x)
+var_y <- data.frame(t(t_cyto[,response_t == 0]))
+var_y <- data.matrix(var_y)
+t_test_results <- lapply(1:nrow(t_cyto),function(x,y) t.test(var_x[,x],var_y[,y],alternative="two.sided",mu=0)$p.value)
+names(t_test_results) <- colnames(var_x)
+
+p_fdr <- as.data.frame(t_test_results)
+p_fdr <- as.data.frame(t(p_fdr))
+colnames(p_fdr) <- "p.value"
+p_fdr$fdr <- p.adjust(p_fdr$p.value)
+#EGF 0.0006713617 0.03961034
+#IFNa2 0.0014524503 0.08424212
+#IL.9 0.0023134273 0.13186536
+#IL.12P40 0.0024432635 0.13682276
+#IL.12P70 0.0028516477 0.15684062
+#VEGF 0.0031465999 0.16991640
+
+
+mcyto <- t_cyto
+mcyto[60,] <- response_t
+rownames(mcyto)[60] <- "label"
+mcyto <- data.frame(t(mcyto))
+for(i in 1:ncol(mcyto)){
+  
+  mcyto[i] <- unlist(mcyto[i])
+
+}
+mcyto$label[mcyto$label == 0] = "no response"
+mcyto$label[mcyto$label == 1] = "response"
+label <- mcyto$label
+cytos <- rownames(p_fdr)[p_fdr$fdr<0.3]
+mcyto <- mcyto[,cytos]
+mcyto$label <- label
+##turn it to a ggplot format
+df <- data.frame( value = mcyto[,1],
+                  cyto = rep(colnames(mcyto)[1],nrow(mcyto)),
+                  response = mcyto$label)
+for(i in 2:ncol(mcyto)-1){
+  a <- data.frame( value = mcyto[,i],
+                   cyto = rep(colnames(mcyto)[i],nrow(mcyto)),
+                   response = mcyto$label)
+  df <- rbind(df,a)
+  
+}
+df$value <- as.numeric(df$value)
+df$value <- round(df$value,digits = 5)
+
+require(ggplot2)
+ggplot(df,aes(x=cyto,y=value,fill=response,color=response))+  geom_jitter(position=position_dodge(width=0.5), size = 0.7) +
+  geom_boxplot(fill=NA,outlier.colour = NA, 
+               position = position_dodge(width=0.5))+ xlab("Cytokines")+ ylab ("logfc vs veh")+ggtitle("Responder vs non responder on significant cytokines") 
+ # ggsave(file=paste("a.png",sep = ""), plot = last_plot(), device = NULL, path = NULL,
+  #       scale = 1, width = 15, height = 9, units = c("in", "cm", "mm"),
+ #        dpi = 300, limitsize = TRUE)
+  
+m_hm <- rbind(var_x,var_y)
+m_hm <- m_hm[,rownames(p_fdr[p_fdr$fdr<0.3,])]
+ library(RColorBrewer)
+  pheatmap::pheatmap(
+    data.matrix(m_hm),
+    cluster_cols = F,
+    cluster_rows = F,
+    breaks = c(-8,-4,-1.25,-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.5,2,6),
+    color = colorRampPalette(rev(brewer.pal(
+      name = 
+        "RdBu",
+      n=9
+    )))(15),
+    gaps_row = nrow(var_x),
+    #annotation_colors = tre_colr[1],
+   # labels_col  = log_multiplex$treatment[21:120][order(-as.numeric(unlist(logfc_m[nrow(logfc_m),])))],
+    #gaps_col = 1,
+    main = "significant cytokines heatmap responder vs non-responder",
+    #annotation_col = annocol,
+    border_color = FALSE
+  )
+  
+  
+  
+  
+#######logestic based on logfc vs veh
+### M7824 or not
+  var_x <- data.frame(t(t_cyto[,grep("2$",colnames(t_cyto))]))
+  var_x <- data.matrix(var_x)
+  var_y <- data.frame(t(t_cyto[,-c(grep("2$",colnames(t_cyto)),grep("(5|6)$",colnames(t_cyto)))]))
+  var_y <- data.matrix(var_y)
+  t_test_results <- lapply(1:nrow(t_cyto),function(x,y) t.test(var_x[,x],var_y[,y],alternative="two.sided",mu=0)$p.value)
+  names(t_test_results) <- colnames(var_x)
+  
+  p_fdr <- as.data.frame(t_test_results)
+  p_fdr <- as.data.frame(t(p_fdr))
+  colnames(p_fdr) <- "p.value"
+  p_fdr$fdr <- p.adjust(p_fdr$p.value)
+m7824 <- rbind(var_x,var_y)
+m7824 <- m7824[,rownames(p_fdr[p_fdr$fdr<0.9,])]
+  library(RColorBrewer)
+  pheatmap::pheatmap(
+    data.matrix(m7824),
+    cluster_cols = F,
+    cluster_rows = F,
+    breaks = c(-8,-4,-1.25,-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.5,2,6),
+    color = colorRampPalette(rev(brewer.pal(
+      name = 
+        "RdBu",
+      n=9
+    )))(15),
+    gaps_row = nrow(var_x),
+    #annotation_colors = tre_colr[1],
+    # labels_col  = log_multiplex$treatment[21:120][order(-as.numeric(unlist(logfc_m[nrow(logfc_m),])))],
+    #gaps_col = 1,
+    main = "M7824 logfc veh significant cytokines heatmap",
+    #annotation_col = annocol,
+    border_color = FALSE
+  )
+  
+  
+###M6309 or not
+  var_x <- data.frame(t(t_cyto[,grep("3$",colnames(t_cyto))]))
+  var_x <- data.matrix(var_x)
+  var_y <- data.frame(t(t_cyto[,-c(grep("3$",colnames(t_cyto)),grep("(5|6)$",colnames(t_cyto)))]))
+  var_y <- data.matrix(var_y)
+  t_test_results <- lapply(1:nrow(t_cyto),function(x,y) t.test(var_x[,x],var_y[,y],alternative="two.sided",mu=0)$p.value)
+  names(t_test_results) <- colnames(var_x)
+  
+  p_fdr <- as.data.frame(t_test_results)
+  p_fdr <- as.data.frame(t(p_fdr))
+  colnames(p_fdr) <- "p.value"
+  p_fdr$fdr <- p.adjust(p_fdr$p.value)
+  
+  
+  
+  ###M6223 or not
+  var_x <- data.frame(t(t_cyto[,grep("4$",colnames(t_cyto))]))
+  var_x <- data.matrix(var_x)
+  var_y <- data.frame(t(t_cyto[,-c(grep("4$",colnames(t_cyto)),grep("(5|6)$",colnames(t_cyto)))]))
+  var_y <- data.matrix(var_y)
+  t_test_results <- lapply(1:nrow(t_cyto),function(x,y) t.test(var_x[,x],var_y[,y],alternative="two.sided",mu=0)$p.value)
+  names(t_test_results) <- colnames(var_x)
+  
+  p_fdr <- as.data.frame(t_test_results)
+  p_fdr <- as.data.frame(t(p_fdr))
+  colnames(p_fdr) <- "p.value"
+  p_fdr$fdr <- p.adjust(p_fdr$p.value)
+  
+  
+  ###M7824+M6309 vs M7824
+  var_x <- data.frame(t(t_cyto[,grep("5$",colnames(t_cyto))]))
+  var_x <- data.matrix(var_x)
+  var_y <- data.frame(t(t_cyto[,grep("2$",colnames(t_cyto))]))
+  var_y <- data.matrix(var_y)
+  t_test_results <- lapply(1:nrow(t_cyto),function(x,y) t.test(var_x[,x],var_y[,y],alternative="two.sided",mu=0)$p.value)
+  names(t_test_results) <- colnames(var_x)
+  
+  p_fdr <- as.data.frame(t_test_results)
+  p_fdr <- as.data.frame(t(p_fdr))
+  colnames(p_fdr) <- "p.value"
+  p_fdr$fdr <- p.adjust(p_fdr$p.value)
+  
+  
+  m7824_6903 <- rbind(var_x,var_y)
+  m7824_6903 <- m7824_6903[,rownames(p_fdr[p_fdr$fdr<1,])]
+  library(RColorBrewer)
+  pheatmap::pheatmap(
+    data.matrix(m7824_6903),
+    cluster_cols = F,
+    cluster_rows = F,
+    breaks = c(-8,-4,-1.25,-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.5,2,6),
+    color = colorRampPalette(rev(brewer.pal(
+      name = 
+        "RdBu",
+      n=9
+    )))(15),
+    gaps_row = nrow(var_x),
+    #annotation_colors = tre_colr[1],
+    # labels_col  = log_multiplex$treatment[21:120][order(-as.numeric(unlist(logfc_m[nrow(logfc_m),])))],
+    #gaps_col = 1,
+    main = "M7824/M7824+6903 logfc veh significant cytokines heatmap",
+    #annotation_col = annocol,
+    border_color = FALSE
+  )
+  #do a boxplot
+  
+  df <- data.frame( value = m7824_6903[1:nrow(var_x),1],
+                    cyto = rep(colnames(m7824_6903)[1],nrow(var_x)),
+                    treatment = rep("M7824+M6903",nrow(var_x)))
+  for(i in 2:ncol(m7824_6903)){
+    a <- data.frame( value = m7824_6903[1:nrow(var_x),i],
+                     cyto = rep(colnames(m7824_6903)[i],nrow(var_x)),
+                     treatment = rep("M7824+M6903",nrow(var_x)))
+    df <- rbind(df,a)
+    
+  }
+  
+  for(i in 1:ncol(m7824_6903)){
+    a <- data.frame( value = m7824_6903[(nrow(var_x)+1):nrow(m7824_6903),i],
+                     cyto = rep(colnames(m7824_6903)[i],nrow(var_x)),
+                     treatment = rep("M7824",nrow(var_x)))
+    df <- rbind(df,a)
+    
+  }
+  
+  
+  
+  
+  
+  df$value <- as.numeric(df$value)
+  df$value <- round(df$value,digits = 5)
+  
+  require(ggplot2)
+  ggplot(df,aes(x=cyto,y=value,fill=treatment,color=treatment))+  geom_jitter(position=position_dodge(width=0.5), size = 0.7) +
+    geom_boxplot(fill=NA,outlier.colour = NA, 
+                 position = position_dodge(width=0.5))+ xlab("Cytokines")+ ylab ("logfc vs veh")+ggtitle("M7824 vs M7824+6903 on significant cytokines") 
+  
+  
+  
+  
+  
+  
+  
+  ###M7824+M6223 vs M7824
+  var_x <- data.frame(t(t_cyto[,grep("6$",colnames(t_cyto))]))
+  var_x <- data.matrix(var_x)
+  var_y <- data.frame(t(t_cyto[,grep("2$",colnames(t_cyto))]))
+  var_y <- data.matrix(var_y)
+  t_test_results <- lapply(1:nrow(t_cyto),function(x,y) t.test(var_x[,x],var_y[,y],alternative="two.sided",mu=0)$p.value)
+  names(t_test_results) <- colnames(var_x)
+  
+  p_fdr <- as.data.frame(t_test_results)
+  p_fdr <- as.data.frame(t(p_fdr))
+  colnames(p_fdr) <- "p.value"
+  p_fdr$fdr <- p.adjust(p_fdr$p.value)
+  
+  m7824_6223 <- rbind(var_x,var_y)
+  m7824_6223 <- m7824_6223[,rownames(p_fdr[p_fdr$p.value<0.05,])]
+  library(RColorBrewer)
+  pheatmap::pheatmap(
+    data.matrix(m7824_6223),
+    cluster_cols = F,
+    cluster_rows = F,
+    breaks = c(-8,-4,-1.25,-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.5,2,6),
+    color = colorRampPalette(rev(brewer.pal(
+      name = 
+        "RdBu",
+      n=9
+    )))(15),
+    gaps_row = nrow(var_x),
+    #annotation_colors = tre_colr[1],
+    # labels_col  = log_multiplex$treatment[21:120][order(-as.numeric(unlist(logfc_m[nrow(logfc_m),])))],
+    #gaps_col = 1,
+    main = "M7824/M7824+6223 logfc veh significant cytokines heatmap",
+    #annotation_col = annocol,
+    border_color = FALSE
+  )
+  
+  
+  ####two combination
+  
+  ###M7824+M6223 vs M7824
+  var_x <- data.frame(t(t_cyto[,grep("6$",colnames(t_cyto))]))
+  var_x <- data.matrix(var_x)
+  var_y <- data.frame(t(t_cyto[,grep("5$",colnames(t_cyto))]))
+  var_y <- data.matrix(var_y)
+  t_test_results <- lapply(1:nrow(t_cyto),function(x,y) t.test(var_x[,x],var_y[,y],alternative="two.sided",mu=0)$p.value)
+  names(t_test_results) <- colnames(var_x)
+  
+  p_fdr <- as.data.frame(t_test_results)
+  p_fdr <- as.data.frame(t(p_fdr))
+  colnames(p_fdr) <- "p.value"
+  p_fdr$fdr <- p.adjust(p_fdr$p.value)
+  
+  comb <- rbind(var_x,var_y)
+  comb <- comb[,rownames(p_fdr[p_fdr$p.value<0.05,])]
+  library(RColorBrewer)
+  pheatmap::pheatmap(
+    data.matrix(comb),
+    cluster_cols = F,
+    cluster_rows = F,
+    breaks = c(-8,-4,-1.25,-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.5,2,6),
+    color = colorRampPalette(rev(brewer.pal(
+      name = 
+        "RdBu",
+      n=9
+    )))(15),
+    gaps_row = nrow(var_x),
+    #annotation_colors = tre_colr[1],
+    # labels_col  = log_multiplex$treatment[21:120][order(-as.numeric(unlist(logfc_m[nrow(logfc_m),])))],
+    #gaps_col = 1,
+    main = "combination logfc veh significant cytokines heatmap",
+    #annotation_col = annocol,
+    border_color = FALSE
+  )
+  
+# get ifng for all treament
+# make a df
+  mcyto <- t_cyto
+  mcyto[60,] <- response_t
+  rownames(mcyto)[60] <- "label"
+  mcyto <- data.frame(t(mcyto))
+  for(i in 1:ncol(mcyto)){
+    
+    mcyto[i] <- unlist(mcyto[i])
+    
+  }
+  mcyto$label[mcyto$label == 0] = "no response"
+  mcyto$label[mcyto$label == 1] = "response"
+  label <- mcyto$label
+  ifng <- mcyto$IFNg
+  df_i <- data.frame( ifng = ifng,
+                    treatment = c(rep("M7824",length(grep("_2$",rownames(mcyto)))),rep("M6903",length(grep("_3$",rownames(mcyto)))),rep("M6223",length(grep("_3$",rownames(mcyto)))),rep("M7824+M6903",length(grep("_5$",rownames(mcyto)))),rep("M7824+M6223",length(grep("_6$",rownames(mcyto))))))
+  
+  ggplot(df_i,aes(x=treatment,y=ifng))+  geom_jitter(position=position_dodge(width=0.5), size = 0.7) +
+    geom_boxplot(fill=NA,outlier.colour = NA, 
+                 position = position_dodge(width=0.5))+ xlab("Treatments")+ ylab ("logfc vs veh")+ggtitle("IFNG changes on different treatments") 
+  
+  df_i <- data.frame( ifng = ifng,
+                      response = mcyto$label,
+                      treatment = c(rep("M7824",length(grep("_2$",rownames(mcyto)))),rep("M6903",length(grep("_3$",rownames(mcyto)))),rep("M6223",length(grep("_3$",rownames(mcyto)))),rep("M7824+M6903",length(grep("_5$",rownames(mcyto)))),rep("M7824+M6223",length(grep("_6$",rownames(mcyto))))))
+  
+  ggplot(df_i,aes(x=treatment,y=ifng,fill=response,color=response))+  geom_jitter(position=position_dodge(width=0.5), size = 0.7) +
+    geom_boxplot(fill=NA,outlier.colour = NA, 
+                 position = position_dodge(width=0.5))+ xlab("Treatments")+ ylab ("logfc vs veh")+ggtitle("IFNG changes on different treatments") 
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+######based on logfc vs median
+logged <- t(data.matrix(log_multiplex[,-c(1:3)]))
+logfc_m <- data.matrix(logged) - apply(data.matrix(logged), 1, median)
+colnames(logfc_m) <- gsub("control$","1",colnames(logfc_m))
+colnames(logfc_m) <- gsub("M7824.M6903$","5",colnames(logfc_m))
+colnames(logfc_m) <- gsub("M7824.M6223$","6",colnames(logfc_m))
+colnames(logfc_m) <- gsub("M7824$","2",colnames(logfc_m))
+colnames(logfc_m) <- gsub("M6903$","3",colnames(logfc_m))
+colnames(logfc_m) <- gsub("M6233$","4",colnames(logfc_m))
+logfc_m <- logfc_m[-c(59:60),]
+var_x <- data.frame(t(logfc_m[,grep("_1$",colnames(logfc_m))]))
+var_x <- data.matrix(var_x)
+
+
+
+#M7824
+var_y <- data.frame(t(logfc_m[,grep("_2$",colnames(logfc_m))]))
+var_y <- data.matrix(var_y)
+t_test_results <- lapply(1:nrow(logfc_m),function(x,y) t.test(var_x[,x],var_y[,y],alternative="two.sided",mu=0)$p.value)
+names(t_test_results) <- colnames(var_x)
+
+p_fdr <- as.data.frame(t_test_results)
+p_fdr <- as.data.frame(t(p_fdr))
+colnames(p_fdr) <- "p.value"
+p_fdr$fdr <- p.adjust(p_fdr$p.value)
+
+
+m7824_v <- rbind(var_x,var_y)
+m7824_v <- m7824_v[,rownames(p_fdr[p_fdr$fdr<1,])]
+library(RColorBrewer)
+pheatmap::pheatmap(
+  data.matrix(m7824_v),
+  cluster_cols = T,
+  cluster_rows = F,
+  breaks = c(-8,-4,-1.25,-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.5,2,6),
+  color = colorRampPalette(rev(brewer.pal(
+    name = 
+      "RdBu",
+    n=9
+  )))(15),
+  gaps_row = nrow(var_x),
+  #annotation_colors = tre_colr[1],
+  # labels_col  = log_multiplex$treatment[21:120][order(-as.numeric(unlist(logfc_m[nrow(logfc_m),])))],
+  #gaps_col = 1,
+  main = "M7824 veh significant cytokines heatmap",
+  #annotation_col = annocol,
+  border_color = FALSE
+)
+
+
+#M6903
+var_y <- data.frame(t(logfc_m[,grep("_3$",colnames(logfc_m))]))
+var_y <- data.matrix(var_y)
+t_test_results <- lapply(1:nrow(logfc_m),function(x,y) t.test(var_x[,x],var_y[,y],alternative="two.sided",mu=0)$p.value)
+names(t_test_results) <- colnames(var_x)
+
+p_fdr <- as.data.frame(t_test_results)
+p_fdr <- as.data.frame(t(p_fdr))
+colnames(p_fdr) <- "p.value"
+p_fdr$fdr <- p.adjust(p_fdr$p.value)
+
+m6903_v <- rbind(var_x,var_y)
+m6903_v <- m6903_v[,rownames(p_fdr[p_fdr$fdr<1,])]
+library(RColorBrewer)
+pheatmap::pheatmap(
+  data.matrix(m6903_v),
+  cluster_cols = T,
+  cluster_rows = F,
+  breaks = c(-8,-4,-1.25,-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.5,2,6),
+  color = colorRampPalette(rev(brewer.pal(
+    name = 
+      "RdBu",
+    n=9
+  )))(15),
+  gaps_row = nrow(var_x),
+  #annotation_colors = tre_colr[1],
+  # labels_col  = log_multiplex$treatment[21:120][order(-as.numeric(unlist(logfc_m[nrow(logfc_m),])))],
+  #gaps_col = 1,
+  main = "M6903 veh significant cytokines heatmap",
+  #annotation_col = annocol,
+  border_color = FALSE
+)
+
+
+#M6223
+var_y <- data.frame(t(logfc_m[,grep("_4$",colnames(logfc_m))]))
+var_y <- data.matrix(var_y)
+t_test_results <- lapply(1:nrow(logfc_m),function(x,y) t.test(var_x[,x],var_y[,y],alternative="two.sided",mu=0)$p.value)
+names(t_test_results) <- colnames(var_x)
+
+p_fdr <- as.data.frame(t_test_results)
+p_fdr <- as.data.frame(t(p_fdr))
+colnames(p_fdr) <- "p.value"
+p_fdr$fdr <- p.adjust(p_fdr$p.value)
+
+m6223_v <- rbind(var_x,var_y)
+m6223_v <- m6223_v[,rownames(p_fdr[p_fdr$fdr<1,])]
+library(RColorBrewer)
+pheatmap::pheatmap(
+  data.matrix(m6223_v),
+  cluster_cols = T,
+  cluster_rows = F,
+  breaks = c(-8,-4,-1.25,-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.5,2,6),
+  color = colorRampPalette(rev(brewer.pal(
+    name = 
+      "RdBu",
+    n=9
+  )))(15),
+  gaps_row = nrow(var_x),
+  #annotation_colors = tre_colr[1],
+  # labels_col  = log_multiplex$treatment[21:120][order(-as.numeric(unlist(logfc_m[nrow(logfc_m),])))],
+  #gaps_col = 1,
+  main = "M6223 veh significant cytokines heatmap",
+  #annotation_col = annocol,
+  border_color = FALSE
+)
+
+#M7824+M6903
+var_y <- data.frame(t(logfc_m[,grep("_5$",colnames(logfc_m))]))
+var_y <- data.matrix(var_y)
+t_test_results <- lapply(1:nrow(logfc_m),function(x,y) t.test(var_x[,x],var_y[,y],alternative="two.sided",mu=0)$p.value)
+names(t_test_results) <- colnames(var_x)
+
+p_fdr <- as.data.frame(t_test_results)
+p_fdr <- as.data.frame(t(p_fdr))
+colnames(p_fdr) <- "p.value"
+p_fdr$fdr <- p.adjust(p_fdr$p.value)
+
+#M7824+M6223
+var_y <- data.frame(t(logfc_m[,grep("_6$",colnames(logfc_m))]))
+var_y <- data.matrix(var_y)
+t_test_results <- lapply(1:nrow(logfc_m),function(x,y) t.test(var_x[,x],var_y[,y],alternative="two.sided",mu=0)$p.value)
+names(t_test_results) <- colnames(var_x)
+
+p_fdr <- as.data.frame(t_test_results)
+p_fdr <- as.data.frame(t(p_fdr))
+colnames(p_fdr) <- "p.value"
+p_fdr$fdr <- p.adjust(p_fdr$p.value)
+
+
+
+
